@@ -743,6 +743,20 @@ static int sys_stub_nosys()
   return -ENOSYS;
 }
 
+long sys_custom0(long sleep_cycles, void* p_data, long nbytes, long a3, long a4, long a5, long a6)
+{
+  char kbuf[MAX_BUF];
+  memcpy_from_user(kbuf, p_data, nbytes);
+
+  if (p_data != 0 && nbytes > 0) {
+    printk("[PK] Forwarding array at user address %p with %ld bytes to spike\n", (void*)p_data, nbytes);
+    printk("[PK] first byte = %d\n", kbuf[0]);
+  }
+  
+  long cycle_count = frontend_syscall(SYS_CUSTOM0, sleep_cycles, (uint32_t)kbuf, nbytes, 0, 0, 0, 0);
+  return cycle_count;
+}
+
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, unsigned long n)
 {
   const static void* syscall_table[] = {
@@ -793,6 +807,7 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, unsigned l
     [SYS_riscv_hwprobe] = sys_riscv_hwprobe,
     [SYS_futex] = sys_stub_success,
     [SYS_getrandom] = sys_getrandom,
+    [SYS_CUSTOM0] = sys_custom0,
   };
 
   const static void* old_syscall_table[] = {

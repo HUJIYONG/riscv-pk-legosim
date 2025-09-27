@@ -63,6 +63,8 @@
 #define SYS_futex 98
 #define SYS_getrandom 278
 
+#define SYS_CUSTOM0 510
+
 #define OLD_SYSCALL_THRESHOLD 1024
 #define SYS_open 1024
 #define SYS_link 1025
