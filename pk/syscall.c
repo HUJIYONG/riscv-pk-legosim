@@ -808,11 +808,6 @@ long sys_custom0(long sleep_cycles, void* p_data, long nbytes, long a3, long a4,
   char kbuf[MAX_BUF];
   memcpy_from_user(kbuf, p_data, nbytes);
 
-  if (p_data != 0 && nbytes > 0) {
-    printk("[PK] Forwarding array at user address %p with %ld bytes to spike\n", (void*)p_data, nbytes);
-    printk("[PK] first byte = %d\n", kbuf[0]);
-  }
-  
   long cycle_count = frontend_syscall(SYS_CUSTOM0, sleep_cycles, (uint32_t)kbuf, nbytes, 0, 0, 0, 0);
   return cycle_count;
 }
