@@ -743,6 +743,66 @@ static int sys_stub_nosys()
   return -ENOSYS;
 }
 
+const static int SYSCALL_LAUNCH       = 501; // Launch request.
+const static int SYSCALL_WAITLAUNCH   = 502; // Waiit launch request.
+const static int SYSCALL_BARRIER      = 503; // Enter barrier.
+const static int SYSCALL_LOCK         = 504; // Lock mutex.
+const static int SYSCALL_UNLOCK       = 505; // Unlock mutex.
+const static int SYSCALL_REMOTE_READ  = 506; // Read cross chiplet
+const static int SYSCALL_REMOTE_WRITE = 507; // Write cross chiplet
+
+long sys_barrier(long uid, long srcX, long srcY, long count, long a4, long a5, long a6) {
+  return frontend_syscall(SYSCALL_BARRIER, uid, srcX, srcY, count, a4, a5, a6);
+}
+
+long sys_lock(long uid, long srcX, long srcY, long a3, long a4, long a5, long a6) {
+  return frontend_syscall(SYSCALL_LOCK, uid, srcX, srcY, a3, a4, a5, a6);
+}
+
+long sys_unlock(long uid, long srcX, long srcY, long a3, long a4, long a5, long a6) {
+  return frontend_syscall(SYSCALL_UNLOCK, uid, srcX, srcY, a3, a4, a5, a6);
+}
+
+long sys_launch(long dstX, long dstY, long srcX, long srcY, long a4, long a5, long a6) {
+  return frontend_syscall(SYSCALL_LAUNCH, dstX, dstY, srcX, srcY, a4, a5, a6);
+}
+
+long sys_waitlaunch(long dstX, long dstY, long p_srcX, long p_srcY, long a4, long a5, long a6) {
+  int k_srcX;
+  int k_srcY;
+  memcpy_from_user(&k_srcX, (void*)p_srcX, sizeof(int));
+  memcpy_from_user(&k_srcY, (void*)p_srcY, sizeof(int));
+  long ret = frontend_syscall(SYSCALL_WAITLAUNCH, dstX, dstY, (uint32_t)&k_srcX, (uint32_t)&k_srcY, a4, a5, a6);
+  memcpy_to_user((void*)p_srcX, &k_srcX, sizeof(int));
+  memcpy_to_user((void*)p_srcY, &k_srcY, sizeof(int));
+  return ret;
+}
+
+#define NOC_BUF_SIZE (1<<17)
+long sys_remote_write(long dstX, long dstY, long srcX, long srcY, long p_data, long nbytes, long a6) {
+  if (nbytes > NOC_BUF_SIZE) {
+    printk("[PK] Error: sys_remote_write transfer size %ld exceeds buffer size %d\n", nbytes, NOC_BUF_SIZE);
+    return -EINVAL;
+  }
+  
+  char kbuf[NOC_BUF_SIZE];
+  memcpy_from_user(kbuf, (void*)p_data, nbytes);
+  return frontend_syscall(SYSCALL_REMOTE_WRITE, dstX, dstY, srcX, srcY, (uint32_t)kbuf, nbytes, a6);
+}
+
+long sys_remote_read(long dstX, long dstY, long srcX, long srcY, long p_data, long nbytes, long a6) {
+  if (nbytes > NOC_BUF_SIZE) {
+    printk("[PK] Error: sys_remote_read transfer size %ld exceeds buffer size %d\n", nbytes, NOC_BUF_SIZE);
+    return -EINVAL;
+  }
+  
+  char kbuf[NOC_BUF_SIZE];
+  long ret = frontend_syscall(SYSCALL_REMOTE_READ, dstX, dstY, srcX, srcY, (uint32_t)kbuf, nbytes, a6);
+  memcpy_to_user((void*)p_data, kbuf, nbytes);
+  return ret;
+}
+
+
 long sys_custom0(long sleep_cycles, void* p_data, long nbytes, long a3, long a4, long a5, long a6)
 {
   char kbuf[MAX_BUF];
@@ -807,6 +867,15 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, unsigned l
     [SYS_riscv_hwprobe] = sys_riscv_hwprobe,
     [SYS_futex] = sys_stub_success,
     [SYS_getrandom] = sys_getrandom,
+
+    [SYSCALL_BARRIER     ] = sys_barrier  ,
+    [SYSCALL_LOCK        ] = sys_lock     ,
+    [SYSCALL_UNLOCK      ] = sys_unlock   ,
+    [SYSCALL_LAUNCH      ] = sys_launch   ,
+    [SYSCALL_WAITLAUNCH  ] = sys_waitlaunch,
+    [SYSCALL_REMOTE_READ ] = sys_remote_read,
+    [SYSCALL_REMOTE_WRITE] = sys_remote_write,
+    
     [SYS_CUSTOM0] = sys_custom0,
   };
 
